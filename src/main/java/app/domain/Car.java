@@ -1,36 +1,61 @@
 package app.domain;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.math.BigDecimal;
-import java.util.Objects;
 
 public class Car {
-
-    private Long id;
+    private long id;
     private String brand;
     private BigDecimal price;
     private int year;
 
-    public Car(String brand, BigDecimal price, int year) {
+    // Конструктор по умолчанию
+    public Car() {
+    }
+
+    // Конструктор с параметрами
+    @JsonCreator
+    public Car(@JsonProperty("brand") String brand,
+               @JsonProperty("price") BigDecimal price,
+               @JsonProperty("year") int year) {
         this.brand = brand;
         this.price = price;
         this.year = year;
     }
 
-    public void setId(Long id) {
+    // Геттеры и сеттеры
+    public long getId() {
+        return id;
+    }
+
+    public void setId(long id) {
         this.id = id;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        Car car = (Car) o;
-        return year == car.year && Objects.equals(id, car.id) && Objects.equals(brand, car.brand) && Objects.equals(price, car.price);
+    public String getBrand() {
+        return brand;
     }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(id, brand, price, year);
+    public void setBrand(String brand) {
+        this.brand = brand;
+    }
+
+    public BigDecimal getPrice() {
+        return price;
+    }
+
+    public void setPrice(BigDecimal price) {
+        this.price = price;
+    }
+
+    public int getYear() {
+        return year;
+    }
+
+    public void setYear(int year) {
+        this.year = year;
     }
 
     @Override
