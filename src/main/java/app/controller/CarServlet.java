@@ -3,6 +3,7 @@ package app.controller;
 import app.domain.Car;
 import app.repository.CarRepository;
 import app.repository.CarRepositoryMap;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
@@ -12,6 +13,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
+import java.math.BigDecimal;
 
 public class CarServlet extends HttpServlet {
 
@@ -22,26 +24,38 @@ public class CarServlet extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        // Для получения из БД всех или одного автомобиля по id
+        // Получение параметра id из запроса
+        String idParam = req.getParameter("id");
 
-        // req - объект запроса, из него мы можем извлечь всё, что прислал клиент
-        // resp - объект ответа, который будет отправлен клиенту после того,
-        //        как отработает наш метод. И мы можем в этот объект поместить всю
-        //        информацию, которую мы хотим отправить клиенту в ответ на его запрос.
-
-        List<Car> cars = repository.getAll();
-        cars.forEach(x -> {
+        // Если параметр id передан, пытаемся найти автомобиль по этому id
+        if (idParam != null) {
             try {
-                resp.getWriter().write(x.toString() + "\n");
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        });
+                int id = Integer.parseInt(idParam);
+                Car car = repository.getById(id);
 
-        // TODO Домашнее задание:
-        // Реализовать получение одного автомобиля по id
-//        Map<String, String[]> parameterMap = req.getParameterMap();
+                if (car != null) {
+                    resp.getWriter().write(car.toString());
+                } else {
+                    resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                    resp.getWriter().write("Car with id " + id + " not found.");
+                }
+            } catch (NumberFormatException e) {
+                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                resp.getWriter().write("Invalid id format.");
+            }
+        } else {
+            // Если параметр id не передан, возвращаем все автомобили
+            List<Car> cars = repository.getAll();
+            cars.forEach(car -> {
+                try {
+                    resp.getWriter().write(car.toString() + "\n");
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        }
     }
+
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
@@ -50,23 +64,71 @@ public class CarServlet extends HttpServlet {
         ObjectMapper mapper = new ObjectMapper();
         Car car = mapper.readValue(req.getReader(), Car.class);
         repository.save(car);
-        resp.getWriter().write(car.toString());
+        resp.getWriter().write("New car saved: " + car.toString());
     }
 
     @Override
     protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        // Для изменения существующего автомобиля в БД
+        // Чтение JSON из тела запроса
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode jsonNode = objectMapper.readTree(req.getReader());
 
-        // TODO Домашнее задание:
-        // Реализовать изменение объекта автомобиля в БД
-        // (при этом меняться должна только цена)
+        // Извлечение id и новой цены из JSON
+        long id = jsonNode.get("id").asLong();
+        BigDecimal newPrice = new BigDecimal(jsonNode.get("price").asText());
+
+        // Поиск автомобиля в базе данных
+        Car car = repository.getById(id);
+
+        if (car == null) {
+            resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+            resp.getWriter().write("Car with id " + id + " not found.");
+            return;
+        }
+
+        // Обновление цены автомобиля
+        repository.updatePrice(id, newPrice);
+
+        // Отправка успешного ответа
+        resp.setStatus(HttpServletResponse.SC_OK);
+        resp.getWriter().write("Car price updated: " + car);
     }
 
     @Override
     protected void doDelete(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        // Для удаления автомобиля из БД
+        // Извлечение параметра id из запроса
+        String idParam = req.getParameter("id");
 
-        // TODO Домашнее задание:
-        // Реализовать удаление автомобиля из БД по id
+        if (idParam == null) {
+            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            resp.getWriter().write("Missing parameter: id");
+            return;
+        }
+
+        try {
+            long id = Long.parseLong(idParam);
+
+            // Поиск и удаление автомобиля в базе данных
+            Car car = repository.getById(id);
+
+            if (car == null) {
+                resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
+                resp.getWriter().write("Car with id " + id + " not found.");
+                return;
+            }
+
+            repository.deleteById(id);
+
+            // Отправка успешного ответа
+            resp.setStatus(HttpServletResponse.SC_OK);
+            resp.getWriter().write("Car with id " + id + " deleted.");
+
+        } catch (NumberFormatException e) {
+            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            resp.getWriter().write("Invalid id format.");
+        } catch (Exception e) {
+            resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            resp.getWriter().write("Error: " + e.getMessage());
+        }
     }
 }
