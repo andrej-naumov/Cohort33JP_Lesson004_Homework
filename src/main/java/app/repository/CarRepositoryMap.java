@@ -30,4 +30,22 @@ public class CarRepositoryMap implements CarRepository {
         database.put(currentId, car);
         return car;
     }
+
+    @Override
+    public Car getById(long id) { // реализация метода getById
+        return database.get(id);
+    }
+
+    @Override
+    public void updatePrice(long id, BigDecimal newPrice) {
+        Car car = database.get(id);
+        if (car != null) {
+            car.setPrice(newPrice);
+        }
+    }
+
+    @Override
+    public void deleteById(long id) {
+        database.remove(id);
+    }
 }
