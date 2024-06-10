@@ -11,9 +11,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
 import java.math.BigDecimal;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class CarServlet extends HttpServlet {
 
@@ -24,38 +25,60 @@ public class CarServlet extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
-        // Получение параметра id из запроса
-        String idParam = req.getParameter("id");
+        // Извлечение параметров запроса
+        String maxPriceParam = req.getParameter("maxPrice");
+        String sortBy = req.getParameter("sortBy");
+        String orderBy = req.getParameter("orderBy");
 
-        // Если параметр id передан, пытаемся найти автомобиль по этому id
-        if (idParam != null) {
+        // Получение всех автомобилей
+        List<Car> cars = repository.getAll();
+
+        // Фильтрация по максимальной цене
+        if (maxPriceParam != null) {
             try {
-                int id = Integer.parseInt(idParam);
-                Car car = repository.getById(id);
-
-                if (car != null) {
-                    resp.getWriter().write(car.toString());
-                } else {
-                    resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                    resp.getWriter().write("Car with id " + id + " not found.");
-                }
+                BigDecimal maxPrice = new BigDecimal(maxPriceParam);
+                cars = cars.stream()
+                        .filter(car -> car.getPrice().compareTo(maxPrice) <= 0)
+                        .collect(Collectors.toList());
             } catch (NumberFormatException e) {
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                resp.getWriter().write("Invalid id format.");
+                resp.getWriter().write("Invalid maxPrice format.");
+                return;
             }
-        } else {
-            // Если параметр id не передан, возвращаем все автомобили
-            List<Car> cars = repository.getAll();
-            cars.forEach(car -> {
-                try {
-                    resp.getWriter().write(car.toString() + "\n");
-                } catch (IOException e) {
-                    throw new RuntimeException(e);
-                }
-            });
         }
-    }
 
+        // Сортировка по указанному полю и порядку
+        if (sortBy != null) {
+            Comparator<Car> comparator = null;
+            switch (sortBy) {
+                case "brand":
+                    comparator = Comparator.comparing(Car::getBrand);
+                    break;
+                case "price":
+                    comparator = Comparator.comparing(Car::getPrice);
+                    break;
+                case "year":
+                    comparator = Comparator.comparing(Car::getYear);
+                    break;
+                default:
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    resp.getWriter().write("Invalid sortBy value.");
+                    return;
+            }
+
+            if (orderBy != null && orderBy.equalsIgnoreCase("desc")) {
+                comparator = comparator.reversed();
+            }
+
+            cars = cars.stream().sorted(comparator).collect(Collectors.toList());
+        }
+
+        // Отправка ответа клиенту
+        for (Car car : cars) {
+            resp.getWriter().write(car.toString() + "\n");
+        }
+        resp.setStatus(HttpServletResponse.SC_OK);
+    }
 
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
